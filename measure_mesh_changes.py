@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from datetime import timedelta, datetime
+import os
 from os import error
 from time import sleep
 from numpy import mean
@@ -26,7 +27,7 @@ BASE_URL = "http://127.0.0.1:7125"  # printer URL (e.g. http://192.168.1.15)
 # leave default if running locally
 BED_TEMPERATURE = 110  # bed temperature for measurements
 HE_TEMPERATURE = 100  # extruder temperature for measurements
-STABLE_TIME = 0  # minutes between temperature comparison to stop the measurements
+STABLE_TIME = 15  # minutes between temperature comparison to stop the measurements
 SOAK_TIME = 5  # minutes to wait for bed to heatsoak after reaching temp
 MEASURE_GCODE = (
     "G28 Z"  # G-code called on repeated measurements, single line/macro only
@@ -400,7 +401,7 @@ def temp_is_changing():
         temp_prev = mean([x[MONITOR_SENSOR] for x in temps_before][-5:])
         temp_curr = mean([x[MONITOR_SENSOR] for x in temps][-5:])
         diff = temp_curr - temp_prev
-        logging.info(f"cur: {temp_curr}, prev: {temp_prev}, diff:{diff}")
+        logging.info(f"{MONITOR_SENSOR}: current: {temp_curr}C  | {STABLE_TIME}m ago: {temp_prev}  |  diff:{diff}")
 
         if round(diff, 2) <= 0:
             logging.info(
@@ -420,8 +421,11 @@ def exit():
         "temp_data": temps,
     }
 
+    if not os.path.isdir("data"):
+        os.mkdir("data")
+
     with open(DATA_FILENAME, "w") as out_file:
-        json.dump(output, out_file, indent=4, sort_keys=True, default=str)
+        json.dump(output, f"./data/{out_file}", indent=4, sort_keys=True, default=str)
     logging.info(f"results written to {DATA_FILENAME}")
 
     set_bedtemp()
