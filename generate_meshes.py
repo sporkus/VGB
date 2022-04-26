@@ -196,5 +196,9 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     if not args:
         fp = data_file_menu()
+    else:
+        fp = args[0]
+        if len(args) > 1:
+            print("Muliple args received. Only processing the first arg")
 
     main(fp)
