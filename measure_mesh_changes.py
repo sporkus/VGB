@@ -9,6 +9,7 @@ import re
 import json
 import logging
 from typing import Dict
+from generate_meshes import main as mesh_processor
 
 ######### META DATA #################
 # For data collection organizational purposes
@@ -27,7 +28,6 @@ BASE_URL = "http://127.0.0.1:7125"  # printer URL (e.g. http://192.168.1.15)
 # leave default if running locally
 BED_TEMPERATURE = 110  # bed temperature for measurements
 HE_TEMPERATURE = 100  # extruder temperature for measurements
-# STABLE_TIME = 15  # minutes between temperature comparison to stop the measurements
 SOAK_MINUTES = 5  # minutes to wait for bed to heatsoak after reaching temp
 MEASURE_HOURS = 3
 MEASURE_GCODE = (
@@ -53,7 +53,8 @@ MONITOR_SENSOR = "frame_temp"
 
 MCU_Z_POS_RE = re.compile(r"(?P<mcu_z>(?<=stepper_z:)-*[0-9.]+)")
 
-date_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+date_str = datetime.now().strftime("%Y%m%d_%H%M")
+DATA_DIR = "./data"
 DATA_FILENAME = "meshes_%s.json" % (date_str)
 start_time = datetime.now() + timedelta(days=1)
 index = 0
@@ -367,15 +368,7 @@ def collect_datapoint(idx):
     start_temp = query_temp_sensors()
     mesh = take_bed_mesh()
     end_temp = query_temp_sensors()
-    logging.info(pretty_temp(start_temp))
-    temps.append(
-        {
-            "time": now,
-            MONITOR_SENSOR: mean(
-                (start_temp[MONITOR_SENSOR], end_temp[MONITOR_SENSOR])
-            ),
-        }
-    )
+    logging.info("Measurement " + str(idx) + ": " + pretty_temp(start_temp))
     measurements.update(
         {
             timestamp: {
@@ -388,44 +381,21 @@ def collect_datapoint(idx):
     )
 
 
-# def temp_is_changing():
-#     global temps
-
-#     temps_before = [
-#         x
-#         for x in temps
-#         if (datetime.now() - x["time"]) >= timedelta(minutes=STABLE_TIME)
-#     ]
-
-#     if len(temps_before) >= 5:
-#         temp_prev = mean([x[MONITOR_SENSOR] for x in temps_before][-5:])
-#         temp_curr = mean([x[MONITOR_SENSOR] for x in temps][-5:])
-#         diff = temp_curr - temp_prev
-#         logging.info(f"{MONITOR_SENSOR}: current: {temp_curr}C  | {STABLE_TIME}m ago: {temp_prev}  |  diff:{diff}")
-
-#         if round(diff, 2) <= 0:
-#             logging.info(
-#                 f"Mean of the last 5 {MONITOR_SENSOR} readings did not increase more than {STABLE_TIME} minutes"
-#             )
-#             return 0
-
-#     return 1
-
-
 def exit():
-    global measurements, temps, metadata, pre_data
+    global measurements, metadata, pre_data
     output = {
         "metadata": metadata,
-        "pre_mesh": pre_data,
+        "mesh_cmd": MESH_CMD,
+        "measurments_cold": pre_data,
         "measurements": measurements,
-        "temp_data": temps,
     }
 
     if not os.path.isdir("data"):
         os.mkdir("data")
 
-    with open(DATA_FILENAME, "w") as out_file:
-        json.dump(output, f"./data/{out_file}", indent=4, sort_keys=True, default=str)
+    fp = f"{DATA_DIR}/{DATA_FILENAME}"
+    with open(fp, "w") as out_file:
+        json.dump(output, out_file, indent=4, sort_keys=True, default=str)
     logging.info(f"results written to {DATA_FILENAME}")
 
     set_bedtemp()
@@ -433,9 +403,11 @@ def exit():
     send_gcode("SET_FRAME_COMP enable=1")
     logging.info("Turning off heaters and re-enabling frame compensation")
 
+    mesh_processor(fp)
+
 
 def main():
-    global measurements, temps, metadata, pre_data
+    global measurements, metadata, pre_data
     temps = []
     measurements = {}
 
@@ -454,6 +426,7 @@ def main():
     logging.info("Disabling frame compensation")
 
     # Take preheat mesh
+    logging.info("Collect data before heating")
     take_bed_mesh()
     pre_time = datetime.now()
     pre_mesh = query_bed_mesh()
@@ -468,8 +441,8 @@ def main():
 
     idx = 0
     start_time = datetime.now()
-    logging.info(f"Taking mesh samples for {MEASURE_HOURS}")
-    while datetime.now() - start_time >= timedelta(hours=MEASURE_HOURS):
+    logging.info(f"Taking mesh samples for {MEASURE_HOURS} hours")
+    while datetime.now() - start_time <= timedelta(hours=MEASURE_HOURS):
         collect_datapoint(idx)
         idx += 1
     logging.info("Measurements complete!")
