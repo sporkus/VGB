@@ -13,12 +13,12 @@ from generate_meshes import main as mesh_processor
 
 ######### META DATA #################
 # For data collection organizational purposes
-USER_ID = "foonietunes"  # e.g. Discord handle
-PRINTER_MODEL = "voron_v2_300"  # e.g. 'voron_v2_350'
-HOME_TYPE = "nozzle_pin"  # e.g. 'nozzle_pin', 'microswitch_probe', etc.
-PROBE_TYPE = "klicky"  # e.g. 'klicky', 'omron', 'bltouch', etc.
-X_RAILS = "1x_mgn12_front"  # e.g. '1x_mgn12_front', '2x_mgn9'
-BACKERS = "none"  # e.g. 'steel_x_y', 'Ti_x-steel_y', 'mgn9_y'
+USER_ID = ""  # e.g. Discord handle
+PRINTER_MODEL = ""  # e.g. 'voron_v2_350'
+HOME_TYPE = ""  # e.g. 'nozzle_pin', 'microswitch_probe', etc.
+PROBE_TYPE = ""  # e.g. 'klicky', 'omron', 'bltouch', etc.
+X_RAILS = ""  # e.g. '1x_mgn12_front', '2x_mgn9'
+BACKERS = ""  # e.g. 'steel_x_y', 'Ti_x-steel_y', 'mgn9_y'
 NOTES = ""  # anything note-worthy about this particular run,
 #     no "=" characters
 #####################################
@@ -39,14 +39,13 @@ QGL_CMD = (
 MESH_CMD = "BED_MESH_CALIBRATE SAMPLES=3 PROBE_COUNT=15,15 RELATIVE_REFERENCE_INDEX=224"
 
 # Full config section name of the frame temperature sensor
-FRAME_SENSOR = "temperature_sensor frame_front"
+FRAME_SENSOR = ""
 # chamber thermistor config name. Change to match your own, or "" if none
 # will also work with temperature_fan configs
-CHAMBER_SENSOR = "temperature_sensor chamber"
+CHAMBER_SENSOR = ""
 # Extra temperature sensors to collect. Use same format as above but seperate
 # quoted names with commas (if more than one).
 EXTRA_SENSORS = {}
-MONITOR_SENSOR = "frame_temp"
 
 #####################################
 
