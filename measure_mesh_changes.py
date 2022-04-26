@@ -27,15 +27,16 @@ BASE_URL = "http://127.0.0.1:7125"  # printer URL (e.g. http://192.168.1.15)
 # leave default if running locally
 BED_TEMPERATURE = 110  # bed temperature for measurements
 HE_TEMPERATURE = 100  # extruder temperature for measurements
-STABLE_TIME = 15  # minutes between temperature comparison to stop the measurements
-SOAK_TIME = 5  # minutes to wait for bed to heatsoak after reaching temp
+# STABLE_TIME = 15  # minutes between temperature comparison to stop the measurements
+SOAK_MINUTES = 5  # minutes to wait for bed to heatsoak after reaching temp
+MEASURE_HOURS = 3
 MEASURE_GCODE = (
     "G28 Z"  # G-code called on repeated measurements, single line/macro only
 )
 QGL_CMD = (
     "QUAD_GANTRY_LEVEL"  # command for QGL; e.g. "QUAD_GANTRY_LEVEL" or None if no QGL.
 )
-MESH_CMD = "BED_MESH_CALIBRATE SAMPLES=1 PROBE_COUNT=11,11 RELATIVE_REFERENCE_INDEX=120"
+MESH_CMD = "BED_MESH_CALIBRATE SAMPLES=3 PROBE_COUNT=15,15 RELATIVE_REFERENCE_INDEX=224"
 
 # Full config section name of the frame temperature sensor
 FRAME_SENSOR = "temperature_sensor frame_front"
@@ -252,7 +253,6 @@ def take_bed_mesh():
 
     # print("Taking bed mesh measurement...", end="", flush=True)
     send_gcode_nowait(cmd)
-
     mesh = query_bed_mesh()
     return mesh
 
@@ -388,28 +388,28 @@ def collect_datapoint(idx):
     )
 
 
-def temp_is_changing():
-    global temps
+# def temp_is_changing():
+#     global temps
 
-    temps_before = [
-        x
-        for x in temps
-        if (datetime.now() - x["time"]) >= timedelta(minutes=STABLE_TIME)
-    ]
+#     temps_before = [
+#         x
+#         for x in temps
+#         if (datetime.now() - x["time"]) >= timedelta(minutes=STABLE_TIME)
+#     ]
 
-    if len(temps_before) >= 5:
-        temp_prev = mean([x[MONITOR_SENSOR] for x in temps_before][-5:])
-        temp_curr = mean([x[MONITOR_SENSOR] for x in temps][-5:])
-        diff = temp_curr - temp_prev
-        logging.info(f"{MONITOR_SENSOR}: current: {temp_curr}C  | {STABLE_TIME}m ago: {temp_prev}  |  diff:{diff}")
+#     if len(temps_before) >= 5:
+#         temp_prev = mean([x[MONITOR_SENSOR] for x in temps_before][-5:])
+#         temp_curr = mean([x[MONITOR_SENSOR] for x in temps][-5:])
+#         diff = temp_curr - temp_prev
+#         logging.info(f"{MONITOR_SENSOR}: current: {temp_curr}C  | {STABLE_TIME}m ago: {temp_prev}  |  diff:{diff}")
 
-        if round(diff, 2) <= 0:
-            logging.info(
-                f"Mean of the last 5 {MONITOR_SENSOR} readings did not increase more than {STABLE_TIME} minutes"
-            )
-            return 0
+#         if round(diff, 2) <= 0:
+#             logging.info(
+#                 f"Mean of the last 5 {MONITOR_SENSOR} readings did not increase more than {STABLE_TIME} minutes"
+#             )
+#             return 0
 
-    return 1
+#     return 1
 
 
 def exit():
@@ -464,12 +464,12 @@ def main():
     set_bedtemp(BED_TEMPERATURE)
     set_hetemp(HE_TEMPERATURE)
     park_head_high()
-    wait_for_bedtemp(soak_time=SOAK_TIME)
+    wait_for_bedtemp(soak_time=SOAK_MINUTES)
 
-    # Mesh until temperature no longer increases above threshold
-    logging.info("Measurements started")
     idx = 0
-    while temp_is_changing():
+    start_time = datetime.now()
+    logging.info(f"Taking mesh samples for {MEASURE_HOURS}")
+    while datetime.now() - start_time >= timedelta(hours=MEASURE_HOURS):
         collect_datapoint(idx)
         idx += 1
     logging.info("Measurements complete!")
