@@ -9,13 +9,21 @@ import numpy as np
 import pandas as pd
 import json
 
+SENSOR = "frame_temp"
 
-def import_measurements(fp, sensor="frame_temp"):
-    with open(fp) as f:
-        data = json.load(f)["measurements"]
 
-    temps = [x[sensor] for x in data.values()]
-    meshs = [x["mesh"] for x in data.values()]
+def import_measurements(fp, sensor=SENSOR):
+    try:
+        with open(fp) as f:
+            data = json.load(f)["measurements"]
+        temps = [x[sensor] for x in data.values()]
+        meshs = [x["mesh"] for x in data.values()]
+    except KeyError as e:
+        print(
+            "Invalid data structure. Use measure_mesh_changes.py to make measurements"
+        )
+        print(e)
+
     return temps, meshs
 
 
@@ -121,10 +129,14 @@ def generate_config(temps, mesh_params, coeffs):
 
     # Temperature range to predict (1C above/below measured range)
     temps = np.array(temps)
-    for t in np.arange(temps.min() - 1, temps.max() + 1, step=0.1):
+    range = [temps.min() - 1, temps.max() + 1]
+    print("Generating meshes between {:.2f}C and {:.2f}C in 0.1C steps".format(*range))
+
+    temps_gen = np.arange(*range, step=0.1)
+    for t in temps_gen:
         predicted = predict_mesh(t, coeffs).round(6).astype(str)
 
-        config.append(f"[bed_mesh linear_reg_{t:.2f}]")
+        config.append(f"[bed_mesh {t:.2f}]")
         config.append("version = 1")
         config.append("points =")
         for row in predicted:
@@ -132,7 +144,36 @@ def generate_config(temps, mesh_params, coeffs):
         config.extend(param_lines)
         config.append("")
 
+    print(f"{len(temps_gen)} meshes generated")
     return ["\n#*# " + line for line in config]
+
+
+def data_file_menu() -> str:
+    try:
+        files = os.listdir("data")
+    except:
+        print("Missing data folder in current folder")
+        return None
+
+    if not len(files):
+        print("No data files found")
+        return None
+
+    files.sort(reverse=True)
+    for i, x in enumerate(files):
+        print(f"{i}: {x}")
+
+    idx = input("Choose a file to process. Default = 0: ")
+
+    try:
+        idx = int(idx)
+    except:
+        print("Enter a number next time")
+        return None
+
+    fp = "./data/" + files[idx]
+    print("Processing measurements in" + fp)
+    return fp
 
 
 def main(data_fp):
@@ -140,13 +181,20 @@ def main(data_fp):
     mesh_params = get_mesh_params(meshs[0])
     probed_matrices = [x["probed_matrix"] for x in meshs]
     coeffs = sample_fit(temps, probed_matrices)
-    xs, ys = make_meshgrid(mesh_params)
+    # xs, ys = make_meshgrid(mesh_params)
 
     cfg = generate_config(temps, mesh_params, coeffs)
-    with open("generated_meshs.cfg", "w") as f:
+    nm = os.path.basename(data_fp).split(".json")[0]
+    with open(nm + ".cfg", "w") as f:
         f.writelines(cfg)
+    print(
+        f"Modeled meshs saved to {nm}.cfg. Please append its content to your printer.cfg"
+    )
 
 
 if __name__ == "__main__":
     args = sys.argv[1:]
-    main(args[0])
+    if not args:
+        fp = data_file_menu()
+
+    main(fp)
